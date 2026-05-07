@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>날짜 선택</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h2 { font-size: 18px; font-weight: 600; margin-bottom: 0.25rem; }
+    .sub { font-size: 13px; color: #888; margin-bottom: 1.25rem; }
+
+    /* 탭 */
+    .tabs { display: flex; gap: 0; margin-bottom: 1.25rem; border: 1.5px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+    .tab {
+      flex: 1; padding: 10px; text-align: center;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      background: white; color: #888; border: none;
+      transition: all 0.15s;
+    }
+    .tab.active { background: #534AB7; color: white; }
+
+    /* 참가자 선택 */
+    .person-select { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .person-btn {
+      padding: 8px 16px; border-radius: 20px;
+      border: 1.5px solid #e0e0e0;
+      background: white; color: #555;
+      font-size: 14px; cursor: pointer; transition: all 0.15s;
+    }
+    .person-btn.selected { border-color: #534AB7; background: #EEEDFE; color: #534AB7; font-weight: 600; }
+
+    /* 달력 */
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .cal-title { font-size: 15px; font-weight: 600; }
+    .cal-nav {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 1.5px solid #e0e0e0; background: white;
+      cursor: pointer; font-size: 16px; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .cal-nav:hover { background: #f0f0f0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 1rem; }
+    .cal-day-label { text-align: center; font-size: 11px; color: #aaa; padding: 4px 0; }
+    .cal-day {
+      aspect-ratio: 1; border: none; background: none;
+      border-radius: 8px; cursor: pointer; font-size: 13px;
+      color: #333; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+      transition: background 0.1s;
+    }
+    .cal-day:hover:not(.empty):not(.past) { background: #f0f0f0; }
+    .cal-day.empty, .cal-day.past { color: #ccc; cursor: default; }
+    .cal-day.selected { background: #EEEDFE; color: #534AB7; font-weight: 600; }
+    .dots { display: flex; gap: 2px; }
+    .dot { width: 4px; height: 4px; border-radius: 50%; }
+
+    /* 저장 버튼 */
+    .btn {
+      width: 100%; padding: 13px;
+      background: #534AB7; color: white;
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+      margin-top: 0.5rem;
+    }
+    .btn:hover { background: #3C3489; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* 결과 */
+    .result-list { display: flex; flex-direction: column; gap: 8px; }
+    .result-item {
+      padding: 12px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+    }
+    .result-item.all-good { border-color: #534AB7; border-left: 4px solid #534AB7; }
+    .result-date { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .all-badge {
+      font-size: 11px; background: #EEEDFE; color: #534AB7;
+      padding: 2px 8px; border-radius: 20px; font-weight: 500;
+    }
+    .name-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+    .pill {
+      font-size: 12px; padding: 3px 10px;
+      border-radius: 20px; font-weight: 500;
+    }
+    .no-result { text-align: center; color: #aaa; font-size: 14px; padding: 2rem 0; }
+
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+      background: #333; color: white; padding: 10px 20px;
+      border-radius: 20px; font-size: 14px; display: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="main-card">
+    <div id="loading" style="text-align:center; padding:3rem 0; color:#aaa;">불러오는 중...</div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ⚠️ 여기에 본인 Supabase 정보 입력
+    const SUPABASE_URL = 'https://yauqjmnhplwzjxxwzwci.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdXFqbW5ocGx3emp4eHd6d2NpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDI5NjcsImV4cCI6MjA5MzcxODk2N30.sh-hUrQ4sMMT13uqw9zDjC89_RZggUTuCn8T4A8D9aw';
+
+    const COLORS = [
+      { bg: '#EEEDFE', text: '#3C3489', dot: '#534AB7' },
+      { bg: '#E1F5EE', text: '#085041', dot: '#0F6E56' },
+      { bg: '#FAECE7', text: '#712B13', dot: '#993C1D' },
+      { bg: '#FBEAF0', text: '#72243E', dot: '#993556' },
+    ];
+
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('room');
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+    let participants = [];
+    let selectedPerson = 0;
+    let savedDates = {}; // { 이름: ["2025-05-07", ...] }
+    let calYear, calMonth;
+    let currentTab = 'select';
+
+    async function init() {
+      if (!roomId) { document.getElementById('main-card').innerHTML = '<p style="color:red;padding:2rem">잘못된 링크예요.</p>'; return; }
+
+      // 방 정보 가져오기
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.${roomId}&select=*`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      const rooms = await res.json();
+      if (!rooms.length) { document.getElementById('main-card').innerHTML = '<p style="color:red;padding:2rem">방을 찾을 수 없어요.</p>'; return; }
+
+      participants = rooms[0].participant_names.split(',');
+
+      // 기존 선택 가져오기
+      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/availabilities?room_id=eq.${roomId}&select=*`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      const avails = await res2.json();
+      avails.forEach(a => {
+        savedDates[a.name] = a.dates ? a.dates.split(',') : [];
+      });
+
+      const now = new Date();
+      calYear = now.getFullYear();
+      calMonth = now.getMonth();
+
+      renderPage();
+    }
+
+    function renderPage() {
+      const card = document.getElementById('main-card');
+      card.innerHTML = `
+        <h2>📅 날짜 선택</h2>
+        <p class="sub" id="room-sub"></p>
+        <div class="tabs">
+          <button class="tab ${currentTab === 'select' ? 'active' : ''}" onclick="switchTab('select')">날짜 선택</button>
+          <button class="tab ${currentTab === 'result' ? 'active' : ''}" onclick="switchTab('result')">결과 보기</button>
+        </div>
+        <div id="tab-content"></div>
+      `;
+      document.getElementById('room-sub').textContent = participants.join(', ') + ' · ' + participants.length + '명';
+      renderTab();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      renderPage();
+    }
+
+    function renderTab() {
+      if (currentTab === 'select') renderSelectTab();
+      else renderResultTab();
+    }
+
+    function renderSelectTab() {
+      const content = document.getElementById('tab-content');
+      const personBtns = participants.map((name, i) =>
+        `<button class="person-btn ${selectedPerson === i ? 'selected' : ''}"
+          onclick="selectPerson(${i})">${name}</button>`
+      ).join('');
+
+      content.innerHTML = `
+        <div class="person-select">${personBtns}</div>
+        <div class="cal-header">
+          <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+          <span class="cal-title" id="cal-title"></span>
+          <button class="cal-nav" onclick="changeMonth(1)">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <button class="btn" id="save-btn" onclick="saveDates()">
+          ${participants[selectedPerson]} 날짜 저장하기
+        </button>
+      `;
+      renderCal();
+    }
+
+    function selectPerson(i) {
+      selectedPerson = i;
+      renderSelectTab();
+    }
+
+    function renderCal() {
+      document.getElementById('cal-title').textContent = `${calYear}년 ${months[calMonth]}`;
+      const grid = document.getElementById('cal-grid');
+      const days = ['일','월','화','수','목','금','토'];
+      let html = days.map(d => `<div class="cal-day-label">${d}</div>`).join('');
+
+      const first = new Date(calYear, calMonth, 1).getDay();
+      const total = new Date(calYear, calMonth + 1, 0).getDate();
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+
+      const currentName = participants[selectedPerson];
+      const myDates = savedDates[currentName] || [];
+
+      for (let i = 0; i < first; i++) html += `<div class="cal-day empty"></div>`;
+
+      for (let d = 1; d <= total; d++) {
+        const dt = new Date(calYear, calMonth, d);
+        const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isPast = dt < today;
+        const isSel = myDates.includes(key);
+
+        // 다른 사람들 점 표시
+        const otherDots = participants.map((name, i) => {
+          if (i === selectedPerson) return '';
+          const dates = savedDates[name] || [];
+          return dates.includes(key) ? `<div class="dot" style="background:${COLORS[i].dot}"></div>` : '';
+        }).join('');
+
+        html += `<button class="cal-day${isPast?' past':''}${isSel?' selected':''}"
+          onclick="${isPast ? '' : `toggleDay('${key}')`}">
+          ${d}
+          ${otherDots ? `<div class="dots">${otherDots}</div>` : ''}
+        </button>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    function toggleDay(key) {
+      const name = participants[selectedPerson];
+      if (!savedDates[name]) savedDates[name] = [];
+      const idx = savedDates[name].indexOf(key);
+      if (idx > -1) savedDates[name].splice(idx, 1);
+      else savedDates[name].push(key);
+      renderCal();
+    }
+
+    function changeMonth(dir) {
+      calMonth += dir;
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCal();
+    }
+
+    async function saveDates() {
+      const name = participants[selectedPerson];
+      const dates = (savedDates[name] || []).join(',');
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = '저장 중...';
+
+      // 기존 데이터 있는지 확인
+      const check = await fetch(
+        `${SUPABASE_URL}/rest/v1/availabilities?room_id=eq.${roomId}&name=eq.${encodeURIComponent(name)}`,
+        { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } }
+      );
+      const existing = await check.json();
+
+      if (existing.length > 0) {
+        // 업데이트
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/availabilities?room_id=eq.${roomId}&name=eq.${encodeURIComponent(name)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`
+            },
+            body: JSON.stringify({ dates })
+          }
+        );
+      } else {
+        // 새로 추가
+        await fetch(`${SUPABASE_URL}/rest/v1/availabilities`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`
+          },
+          body: JSON.stringify({ room_id: roomId, name, dates })
+        });
+      }
+
+      showToast(`${name} 날짜가 저장됐어요 ✓`);
+      btn.disabled = false;
+      btn.textContent = `${name} 날짜 저장하기`;
+    }
+
+    function renderResultTab() {
+      const content = document.getElementById('tab-content');
+
+      // 날짜별로 누가 가능한지 정리
+      const dateMap = {};
+      participants.forEach((name, i) => {
+        const dates = savedDates[name] || [];
+        dates.forEach(d => {
+          if (!dateMap[d]) dateMap[d] = [];
+          dateMap[d].push({ name, colorIdx: i });
+        });
+      });
+
+      const sorted = Object.keys(dateMap).sort();
+      if (!sorted.length) {
+        content.innerHTML = `<p class="no-result">아직 선택된 날짜가 없어요</p>`;
+        return;
+      }
+
+      const items = sorted.map(key => {
+        const [y, m, d] = key.split('-').map(Number);
+        const dt = new Date(y, m-1, d);
+        const wday = weekdays[dt.getDay()];
+        const people = dateMap[key];
+        const isAll = people.length === participants.length;
+        const pills = people.map(p =>
+          `<span class="pill" style="background:${COLORS[p.colorIdx].bg};color:${COLORS[p.colorIdx].text}">${p.name}</span>`
+        ).join('');
+
+        return `<div class="result-item${isAll ? ' all-good' : ''}">
+          <div class="result-date">
+            ${m}월 ${d}일 (${wday})
+            ${isAll ? '<span class="all-badge">✓ 전원 가능</span>' : ''}
+          </div>
+          <div class="name-pills">${pills}</div>
+        </div>`;
+      }).join('');
+
+      content.innerHTML = `<div class="result-list">${items}</div>`;
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 2500);
+    }
+
+    init();
+  </script>
+</body>
+</html>
