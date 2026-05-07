@@ -26,20 +26,6 @@
     h1 { font-size: 22px; font-weight: 600; margin-bottom: 0.25rem; }
     .sub { font-size: 14px; color: #888; margin-bottom: 1.5rem; }
     label { font-size: 13px; font-weight: 500; color: #444; display: block; margin-bottom: 6px; }
-    .count-row { display: flex; gap: 8px; margin-bottom: 1.25rem; }
-    .count-btn {
-      flex: 1; padding: 12px 0;
-      border: 1.5px solid #e0e0e0;
-      border-radius: 10px;
-      background: white;
-      font-size: 15px;
-      cursor: pointer;
-      color: #555;
-      transition: all 0.15s;
-    }
-    .count-btn:hover { border-color: #534AB7; color: #534AB7; }
-    .count-btn.selected { border-color: #534AB7; background: #EEEDFE; color: #534AB7; font-weight: 600; }
-    .name-inputs { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.25rem; }
     input[type="text"] {
       width: 100%; height: 44px;
       border: 1.5px solid #e0e0e0;
@@ -48,6 +34,7 @@
       font-size: 15px;
       outline: none;
       transition: border-color 0.15s;
+      margin-bottom: 1.25rem;
     }
     input[type="text"]:focus { border-color: #534AB7; }
     .btn {
@@ -60,65 +47,43 @@
     .btn:hover { background: #3C3489; }
     .btn:disabled { background: #ccc; cursor: not-allowed; }
     .spinner { display: none; text-align: center; margin-top: 1rem; color: #888; font-size: 14px; }
+    .link-box {
+      display: none;
+      margin-top: 1rem;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #444;
+      word-break: break-all;
+    }
+    .link-box span { color: #534AB7; font-weight: 500; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>📅 약속 잡기</h1>
-    <p class="sub">친구들과 가능한 날짜를 맞춰보세요</p>
+    <p class="sub">링크를 공유하면 친구들이 각자 날짜를 선택해요</p>
 
-    <label>몇 명이서 만나나요?</label>
-    <div class="count-row">
-      <button class="count-btn" onclick="selectCount(2)">2인</button>
-      <button class="count-btn" onclick="selectCount(3)">3인</button>
-      <button class="count-btn" onclick="selectCount(4)">4인</button>
-    </div>
+    <label>약속 이름</label>
+    <input type="text" id="title-input" placeholder="예) 5월 모임" oninput="checkReady()" maxlength="20">
 
-    <label>이름을 입력해주세요</label>
-    <div class="name-inputs" id="name-inputs">
-      <input type="text" placeholder="이름 1" oninput="checkReady()" maxlength="8">
-      <input type="text" placeholder="이름 2" oninput="checkReady()" maxlength="8">
-    </div>
-
-    <button class="btn" id="create-btn" onclick="createRoom()" disabled>방 만들기</button>
+    <button class="btn" id="create-btn" onclick="createRoom()" disabled>방 만들고 링크 복사하기</button>
     <div class="spinner" id="spinner">방을 만들고 있어요...</div>
+    <div class="link-box" id="link-box"></div>
   </div>
 
   <script>
-    // ⚠️ 여기에 본인 Supabase 정보 입력
     const SUPABASE_URL = 'https://yauqjmnhplwzjxxwzwci.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhdXFqbW5ocGx3emp4eHd6d2NpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDI5NjcsImV4cCI6MjA5MzcxODk2N30.sh-hUrQ4sMMT13uqw9zDjC89_RZggUTuCn8T4A8D9aw';
 
-    let count = 2;
-
-    function selectCount(n) {
-      count = n;
-      document.querySelectorAll('.count-btn').forEach(b => b.classList.remove('selected'));
-      document.querySelectorAll('.count-btn')[n - 2].classList.add('selected');
-
-      const container = document.getElementById('name-inputs');
-      container.innerHTML = '';
-      for (let i = 0; i < n; i++) {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = `이름 ${i + 1}`;
-        input.maxLength = 8;
-        input.oninput = checkReady;
-        container.appendChild(input);
-      }
-      checkReady();
-    }
-
     function checkReady() {
-      const inputs = document.querySelectorAll('#name-inputs input');
-      const allFilled = Array.from(inputs).every(i => i.value.trim() !== '');
-      document.getElementById('create-btn').disabled = !allFilled;
+      const val = document.getElementById('title-input').value.trim();
+      document.getElementById('create-btn').disabled = !val;
     }
 
     async function createRoom() {
-      const inputs = document.querySelectorAll('#name-inputs input');
-      const names = Array.from(inputs).map(i => i.value.trim());
-
+      const title = document.getElementById('title-input').value.trim();
       document.getElementById('create-btn').disabled = true;
       document.getElementById('spinner').style.display = 'block';
 
@@ -130,18 +95,31 @@
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Prefer': 'return=representation'
         },
-        body: JSON.stringify({ participant_names: names.join(',') })
+        body: JSON.stringify({ title })
       });
 
       const data = await res.json();
       const roomId = data[0].id;
+      const link = `${window.location.origin}/room?room=${roomId}`;
 
-      // 방 ID를 URL에 넣어서 room.html로 이동
-      window.location.href = `/room?room=${roomId}`;
+      document.getElementById('spinner').style.display = 'none';
+
+      // 클립보드 복사 시도
+      try {
+        await navigator.clipboard.writeText(link);
+        document.getElementById('create-btn').textContent = '✓ 링크가 복사됐어요!';
+        document.getElementById('create-btn').style.background = '#0F6E56';
+      } catch(e) {
+        // 복사 실패 시 링크 직접 표시
+        document.getElementById('create-btn').textContent = '✓ 방이 만들어졌어요!';
+        document.getElementById('create-btn').style.background = '#0F6E56';
+      }
+
+      // 링크 항상 표시
+      const linkBox = document.getElementById('link-box');
+      linkBox.style.display = 'block';
+      linkBox.innerHTML = `친구들에게 이 링크를 보내세요:<br><span>${link}</span>`;
     }
-
-    // 초기 선택
-    selectCount(2);
   </script>
 </body>
 </html>
