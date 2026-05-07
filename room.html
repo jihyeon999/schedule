@@ -119,11 +119,30 @@
       background: #333; color: white; padding: 10px 20px;
       border-radius: 20px; font-size: 14px; display: none; z-index: 100;
     }
+    .top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 480px;
+    margin: 0 auto 0.75rem;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none;
+  font-size: 13px; color: #888;
+  cursor: pointer; padding: 4px 0;
+ }
+.nav-btn:hover { color: #534AB7; }
   </style>
+
 </head>
 <body>
   <div class="card" id="main-card">
     <div style="text-align:center; padding:3rem 0; color:#aaa;">불러오는 중...</div>
+  </div>
+  <div class="top-nav">
+   <button class="nav-btn" onclick="history.back()">⬅️ 뒤로가기</button>
+   <button class="nav-btn" onclick="window.location.href='/'">🏠 메인으로</button>
   </div>
   <div class="toast" id="toast"></div>
 
