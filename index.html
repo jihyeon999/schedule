@@ -118,8 +118,18 @@
       // 링크 항상 표시
       const linkBox = document.getElementById('link-box');
       linkBox.style.display = 'block';
-      linkBox.innerHTML = `친구들에게 이 링크를 보내세요:<br><span>${link}</span>`;
+      linkBox.innerHTML = `친구들에게 이 링크를 보내세요:<br>
+        <span id="link-text" onclick="copyLink()" style="cursor:pointer;text-decoration:underline dotted;">${link}</span>
+        <br><small style="color:#aaa;">클릭하면 복사돼요</small>`;
     }
+    function copyLink() {   
+        const link = document.getElementById('link-text').textContent;
+        navigator.clipboard.writeText(link);
+        document.getElementById('link-text').textContent = '✓ 복사됐어요!';
+        setTimeout(() => {
+            document.getElementById('link-text').textContent = link;
+        }, 2000);
+}
   </script>
 </body>
 </html>
